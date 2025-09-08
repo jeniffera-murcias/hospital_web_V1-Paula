@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Hospital — Sistema de Gestión</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🏥</div>
+  <nav>
+    <a href="{{ url_for('home') }}">Inicio</a>
+    <a href="#">Quienes Somos</a>
+    <a href="#">Comunidad</a>
+    <a href="#">Recursos</a>
+    <a href="#">Contacto</a>
+    <a href="{{ url_for('login_get') }}">Log In</a>
+    <a class="btn" href="{{ url_for('register_get') }}">Register</a>
+    {% if session.get('user_id') %}
+      <span class="chip">{{ session.get('user_id') }} / {{ session.get('role') }}</span>
+      <a class="btn-outline" href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a class="btn-outline" href="{{ url_for('logout') }}">Salir</a>
+    {% endif %}
+  </nav>
+</header>
+
+{% with msgs = get_flashed_messages() %}
+  {% if msgs %}
+  <div class="flash">
+    {% for m in msgs %}<div>{{ m }}</div>{% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div>Terminos y Condiciones · Políticas de Uso · Seguridad de la Información · © 2025</div>
+</footer>
+</body>
+</html>

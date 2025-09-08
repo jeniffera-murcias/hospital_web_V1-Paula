@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.sqlite
+*.sqlite3
+
+# Entornos
+.venv/
+venv/
+env/
+ENV/
+
+# Variables de entorno / secretos
+.env
+*.env
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

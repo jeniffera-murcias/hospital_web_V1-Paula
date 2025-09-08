@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>HOSPITAL</h1>
+  <p class="subtitle">Sistema de Gestión De Información</p>
+  <div class="cards">
+    <div class="card">👩‍⚕️</div>
+    <div class="card">🚑</div>
+    <div class="card">🏥</div>
+    <div class="card">🚑</div>
+    <div class="card">👩‍⚕️</div>
+  </div>
+</section>
+
+{% if lista %}
+  <h2>Directorio</h2>
+  <ul class="list">
+    {% for x in lista %}
+      <li>{{ x.id }} — {{ x.nombre }} {% if x.especialidad %} ({{ x.especialidad }}){% endif %}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}
