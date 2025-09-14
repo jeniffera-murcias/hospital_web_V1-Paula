@@ -5,24 +5,31 @@
   <title>Hospital — Sistema de Gestión</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">🏥</div>
-  <nav>
-    <a href="{{ url_for('home') }}">Inicio</a>
-    <a href="#">Quienes Somos</a>
-    <a href="#">Comunidad</a>
-    <a href="#">Recursos</a>
-    <a href="#">Contacto</a>
-    <a href="{{ url_for('login_get') }}">Log In</a>
-    <a class="btn" href="{{ url_for('register_get') }}">Register</a>
-    {% if session.get('user_id') %}
-      <span class="chip">{{ session.get('user_id') }} / {{ session.get('role') }}</span>
-      <a class="btn-outline" href="{{ url_for('dashboard') }}">Dashboard</a>
-      <a class="btn-outline" href="{{ url_for('logout') }}">Salir</a>
-    {% endif %}
-  </nav>
+  <div class="brand">🏥 HOSPITAL </div>
+  <   <nav>
+      {% if session.get('user') %}
+        <span class="muted">Hola, {{ session['user']['nombre'] }} ({{ session['user']['rol'] }})</span>
+        {% if session['user']['rol'] == 'PACIENTE' %}
+          <a href="{{ url_for('paciente_agendar') }}" class="btn-link">Agendar</a>
+          <a href="{{ url_for('paciente_citas') }}" class="btn-link">Mis Citas</a>
+          <a href="{{ url_for('paciente_historial') }}" class="btn-link">Historial</a>
+          <a href="{{ url_for('recomendaciones') }}" class="btn-link">Recomendaciones</a>
+        {% elif session['user']['rol'] == 'MEDICO' %}
+          <a href="{{ url_for('medico_citas') }}" class="btn-link">Mis Citas</a>
+          <a href="{{ url_for('reportes') }}" class="btn-link">Reportes</a>
+        {% else %}
+          <a href="{{ url_for('reportes') }}" class="btn-link">Reportes</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="btn-link">Salir</a>
+      {% else %}
+        <a href="{{ url_for('login_get') }}" class="btn-link">Login</a>
+        <a href="{{ url_for('register_get') }}" class="btn">Registro</a>
+      {% endif %}
+    </nav>
 </header>
 
 {% with msgs = get_flashed_messages() %}

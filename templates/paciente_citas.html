@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Mis Citas</h2>
+{% if citas %}
+  <table>
+    <thead><tr><th>Fecha</th><th>Hora</th><th>Médico</th><th>Tipo</th><th>Estado</th></tr></thead>
+    <tbody>
+      {% for c in citas %}
+      <tr>
+        <td>{{ c.fecha }}</td>
+        <td>{{ c.hora }}</td>
+        <td>{{ c.medico_nombre }} {% if c.medico_especialidad %}({{ c.medico_especialidad }}){% endif %}</td>
+        <td>{{ c.tipo }}</td>
+        <td>{{ c.estado }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No tienes citas registradas.</p>
+{% endif %}
+<a class="btn" href="{{ url_for('paciente_agendar') }}">Agendar nueva</a>
+{% endblock %}

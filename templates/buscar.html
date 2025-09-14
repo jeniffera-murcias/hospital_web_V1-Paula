@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Buscar Usuarios</h2>
+
+<form method="get" action="{{ url_for('buscar') }}">
+  <input type="text" name="q" placeholder="Buscar por nombre..." value="{{ query }}">
+  <button type="submit" class="btn">Buscar</button>
+</form>
+
+{% if resultados %}
+  <h3>Resultados:</h3>
+  <ul>
+    {% for r in resultados %}
+      <li>{{ r['nombre'] }} ({{ r['rol'] }}) - {{ r['tipo_documento'] }} {{ r['numero_documento'] }}</li>
+    {% endfor %}
+  </ul>
+{% elif query %}
+  <p>No se encontraron resultados para "{{ query }}"</p>
+{% endif %}
+
+<a class="btn-outline" href="{{ url_for('dashboard_paciente') }}">Volver</a>
+{% endblock %}

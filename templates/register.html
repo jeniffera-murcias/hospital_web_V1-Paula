@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Registro</h2>
+<div class="tabs">
+  <button class="tab active" onclick="setRol('PACIENTE', this)">Paciente</button>
+  <button class="tab" onclick="setRol('MEDICO', this)">Médico</button>
+</div>
+
+<form method="post" class="form">
+  <input type="hidden" name="role" id="role" value="PACIENTE">
+
+  <label>Tipo de Documento:
+    <select name="tipo_documento" required>
+      <option value="CC">Cédula de Ciudadanía</option>
+      <option value="TI">Tarjeta de Identidad</option>
+      <option value="CE">Cédula de Extranjería</option>
+      <option value="PA">Pasaporte</option>
+    </select>
+  </label>
+
+  <label>Número de Documento <input name="numero_documento" required></label>
+  <label>Nombre Completo <input name="nombre" required></label>
+  <label>Correo <input type="email" name="correo" required></label>
+  <label>Celular <input name="celular" required></label>
+
+  <!-- PACIENTE -->
+  <div id="paciente">
+    <label>Edad <input name="edad" type="number" min="0"></label>
+    <label>Género
+      <select name="genero">
+        <option value="M">Masculino</option>
+        <option value="F">Femenino</option>
+        <option value="O">Otro</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- MÉDICO -->
+  <div id="medico" style="display:none">
+    <label>Especialidad <input name="especialidad"></label>
+    <label>Número Tarjeta Profesional <input name="tarjeta_profesional"></label>
+  </div>
+
+  <label>Contraseña <input type="password" name="password" required></label>
+  <label>Confirmar Contraseña <input type="password" name="confirm_password" required></label>
+
+  <button class="btn" type="submit">Registrar</button>
+  <a class="btn-outline" href="{{ url_for('login_get') }}">Ir a Login</a>
+</form>
+
+<script>
+function setRol(rol, btn){
+  document.getElementById('role').value = rol;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('paciente').style.display = rol==='PACIENTE'?'block':'none';
+  document.getElementById('medico').style.display = rol==='MEDICO'?'block':'none';
+}
+</script>
+{% endblock %}
