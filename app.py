@@ -12,180 +12,466 @@ from services.historial_service import HistorialService
 from services.reportes_service import ReportesService
 from services.undo_service import UndoService
 
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
+import os
+import datetime
+
 app = Flask(__name__)
-app.secret_key = "dev-secret"
+app.secret_key = "cambia-esta-clave"  # pon algo seguro
+DB = "hospital.db"
 
-# ---- Infra global (memoria) ----
-_pacientes = HashTable(); _t_pac = Trie(); _bst_pac = BST()
-_medicos   = HashTable(); _t_med = Trie(); _bst_med = BST()
-_pq = PriorityQueue()
-_stacks_por_usuario = {}  # id -> Stack
+# --- Helpers de BD ---
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-pacientes_service = PacientesService(_pacientes, _t_pac, _bst_pac)
-medicos_service   = MedicosService(_medicos, _t_med, _bst_med)
-citas_service     = CitasService(_pq)
-historial_service = HistorialService(_pacientes)
-reportes_service  = ReportesService()
+def get_user_by_doc(tipo, numero):
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE tipo_documento=? AND numero_documento=?", (tipo, numero))
+    user = cur.fetchone()
+    con.close()
+    return user
 
-# semillas
-pacientes_service.seed()
-medicos_service.seed()
+def get_user_by_id(uid):
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE id=?", (uid,))
+    u = cur.fetchone()
+    con.close()
+    return u
 
-def _stack():
-    uid = session.get("user_id")
-    if uid not in _stacks_por_usuario: _stacks_por_usuario[uid] = Stack()
-    return _stacks_por_usuario[uid]
-
-# ---------- Helpers ----------
-def require_auth():
-    if not session.get("user_id"):
-        flash("Inicia sesión.")
-        return False
-    return True
-
-# ---------- Rutas públicas ----------
-@app.get("/")
+def get_medicos():
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT id, nombre, especialidad FROM usuarios WHERE rol='MEDICO'")
+    res = cur.fetchall()
+    con.close()
+    return res
+# --- Rutas ---
+@app.route("/")
 def home():
-    return render_template("home.html")
+    if "user" in session:
+        rol = session["user"]["rol"]
+        return redirect(url_for("dashboard_paciente" if rol=="PACIENTE" else "dashboard_medico"))
+    return redirect(url_for("login_get"))
 
+# LOGIN
 @app.get("/login")
 def login_get():
-    return render_template("auth_login.html")
+    return render_template("login.html")
 
 @app.post("/login")
 def login_post():
-    session["user_id"] = request.form["user_id"].strip()
-    session["role"]    = request.form["role"].strip().upper()
-    flash("Sesión iniciada.")
-    return redirect(url_for("dashboard"))
+    tipo = request.form.get("tipo_documento")
+    numero = request.form.get("numero_documento")
+    password = request.form.get("password")
 
+    user = get_user_by_doc(tipo, numero)
+    if not user or not check_password_hash(user["password"], password):
+        flash("Credenciales inválidas", "error")
+        return redirect(url_for("login_get"))
+
+    # guardar en sesión (lo mínimo necesario)
+    session["user"] = {
+        "id": user["id"],
+        "nombre": user["nombre"],
+        "rol": user["rol"],
+        "tipo_documento": user["tipo_documento"],
+        "numero_documento": user["numero_documento"],
+    }
+
+    # Redirección por rol
+    if user["rol"] == "PACIENTE":
+        return redirect(url_for("dashboard_paciente"))
+    else:
+        return redirect(url_for("dashboard_medico"))
+
+# REGISTRO
 @app.get("/register")
 def register_get():
-    return render_template("auth_register.html")
+    return render_template("register.html")
 
 @app.post("/register")
 def register_post():
-    role = request.form["role"].strip().upper()
-    uid  = request.form["user_id"].strip()
-    nombre = request.form["nombre"].strip()
+    role = request.form.get("role")  # 'PACIENTE' o 'MEDICO'
+    tipo = request.form.get("tipo_documento")
+    numero = request.form.get("numero_documento")
+    nombre = request.form.get("nombre")
+    correo = request.form.get("correo")
+    celular = request.form.get("celular")
+    password = request.form.get("password")
+    confirm = request.form.get("confirm_password")
 
-    try:
-        if role=="PACIENTE":
-            edad = int(request.form.get("edad","0") or "0")
-            pacientes_service.crear(uid, nombre, edad)
-        else:
-            esp = request.form.get("especialidad","General")
-            medicos_service.crear(uid, nombre, esp)
-    except ValueError as e:
-        flash(str(e))
+    if password != confirm:
+        flash("Las contraseñas no coinciden", "error")
         return redirect(url_for("register_get"))
 
-    flash("✅ Registro creado. Ya puedes iniciar sesión.")
+    # Campos específicos
+    edad = request.form.get("edad") if role == "PACIENTE" else None
+    genero = request.form.get("genero") if role == "PACIENTE" else None
+    especialidad = request.form.get("especialidad") if role == "MEDICO" else None
+    tarjeta = request.form.get("tarjeta_profesional") if role == "MEDICO" else None
+
+    # Validación básica
+    if get_user_by_doc(tipo, numero):
+        flash("Ya existe un usuario con ese documento", "error")
+        return redirect(url_for("register_get"))
+
+    # Guardar
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("""INSERT INTO usuarios 
+        (tipo_documento, numero_documento, nombre, correo, celular, rol, edad, genero, especialidad, tarjeta_profesional, password)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (tipo, numero, nombre, correo, celular, role, edad, genero, especialidad, tarjeta,
+         generate_password_hash(password))
+    )
+    con.commit()
+    con.close()
+
+    flash("Registro exitoso. Ahora puedes iniciar sesión.", "success")
     return redirect(url_for("login_get"))
 
+# LOGOUT
 @app.get("/logout")
 def logout():
     session.clear()
-    flash("Sesión cerrada.")
-    return redirect(url_for("home"))
+    return redirect(url_for("login_get"))
 
-# ---------- Dashboard ----------
-@app.get("/dashboard")
-def dashboard():
-    if not require_auth(): return redirect(url_for("login_get"))
-    if session["role"]=="PACIENTE":
-        p = pacientes_service.get(session["user_id"])
-        return render_template("dashboard_patient.html",
-            paciente=p, medicos=medicos_service.listar_az())
-    else:
-        m = medicos_service.get(session["user_id"])
-        return render_template("dashboard_doctor.html",
-            medico=m, pacientes=pacientes_service.listar_az())
+# DASHBOARDS
+@app.get("/paciente")
+def dashboard_paciente():
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+    return render_template("dashboard_paciente.html", user=session["user"])
 
-# ---------- Acciones PACIENTE ----------
-@app.post("/paciente/agendar")
+@app.route("/paciente/agendar", methods=["GET", "POST"])
 def paciente_agendar():
-    if not require_auth(): return redirect(url_for("login_get"))
-    pid = session["user_id"]
-    mid = request.form["medico_id"].strip()
-    fecha = request.form["fecha"].strip()
-    prioridad = int(request.form.get("prioridad","1") or "1")
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+    medicos = get_medicos()
+    if request.method == "POST":
+        medico_id = request.form.get("medico_id")
+        fecha = request.form.get("fecha")   # YYYY-MM-DD
+        hora = request.form.get("hora")     # HH:MM
+        tipo = request.form.get("tipo")     # CONSULTA / EMERGENCIA
+        paciente_id = session["user"]["id"]
+        # validaciones básicas
+        if not (medico_id and fecha and hora and tipo):
+            flash("Completa todos los campos", "error")
+            return redirect(url_for("paciente_agendar"))
+        con = get_db()
+        cur = con.cursor()
+        cur.execute("""INSERT INTO citas (paciente_id, medico_id, fecha, hora, tipo, estado)
+                       VALUES (?, ?, ?, ?, ?, 'PENDIENTE')""",
+                    (paciente_id, medico_id, fecha, hora, tipo))
+        con.commit()
+        con.close()
+        flash("Cita agendada correctamente", "success")
+        return redirect(url_for("paciente_citas"))
+    return render_template("paciente_agendar.html", medicos=medicos)
 
-    # do/undo
-    def do():
-        c = citas_service.agendar(pid, mid, fecha, prioridad)
-        session["last_cita_id"] = c.id
-    def undo():
-        # deshacer ≈ sacar de la cola si es la última (demo simple)
-        pass
-    UndoService(_stack()).ejecutar(do, undo)
-
-    flash("Cita registrada.")
-    return redirect(url_for("dashboard"))
+@app.get("/paciente/citas")
+def paciente_citas():
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+    pid = session["user"]["id"]
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("""SELECT c.*, m.nombre as medico_nombre, m.especialidad as medico_especialidad
+                   FROM citas c JOIN usuarios m ON c.medico_id = m.id
+                   WHERE c.paciente_id = ? ORDER BY fecha, hora""", (pid,))
+    citas = cur.fetchall()
+    con.close()
+    return render_template("paciente_citas.html", citas=citas)
 
 @app.get("/paciente/historial")
 def paciente_historial():
-    if not require_auth(): return redirect(url_for("login_get"))
-    h = historial_service.ver(session["user_id"])
-    return render_template("dashboard_patient.html",
-        paciente=pacientes_service.get(session["user_id"]),
-        medicos=medicos_service.listar_az(),
-        historial=list(h.iter_forward()) if h else [])
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+    pid = session["user"]["id"]
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("""SELECT h.*, m.nombre as medico_nombre FROM historial h
+                   LEFT JOIN usuarios m ON h.medico_id=m.id
+                   WHERE h.paciente_id=? ORDER BY fecha DESC""", (pid,))
+    rows = cur.fetchall()
+    con.close()
+    return render_template("paciente_historial.html", historial=rows)
 
-# ---------- Acciones MÉDICO ----------
-@app.post("/medico/tomar")
-def medico_tomar():
-    if not require_auth(): return redirect(url_for("login_get"))
-    c = citas_service.tomar_siguiente(medico_id=session["user_id"])
-    flash("Sin citas." if not c else f"Cita en curso: {c.id} (paciente {c.paciente_id})")
-    return redirect(url_for("dashboard"))
-
-@app.post("/medico/consulta")
-def medico_consulta():
-    if not require_auth(): return redirect(url_for("login_get"))
-    pid   = request.form["paciente_id"].strip()
-    diag  = request.form["diag"].strip()
-    trat  = request.form["trat"].strip()
-    fecha = request.form["fecha"].strip()
-    m_id  = session["user_id"]
-
-    def do():
-        historial_service.agregar(pid, diag, trat, fecha, m_id)
-    def undo():
-        # demo: no implementamos borrado en DLL; se puede con punteros al nodo
-        pass
-    UndoService(_stack()).ejecutar(do, undo)
-    flash("Consulta agregada al historial.")
-    return redirect(url_for("dashboard"))
-
-# ---------- Búsqueda / Directorios ----------
 @app.get("/buscar")
 def buscar():
-    q = request.args.get("q","").strip()
-    tipo = request.args.get("tipo","paciente")
-    if tipo=="medico":
-        res = medicos_service.buscar(q)
-    else:
-        res = pacientes_service.buscar(q)
-    if not isinstance(res, list): res = [res] if res else []
-    names = [f"{getattr(x,'id','')} - {getattr(x,'nombre','')}" for x in res if x]
-    flash("Resultados: " + "; ".join(names) if names else "Sin resultados")
-    return redirect(url_for("dashboard"))
+    if "user" not in session:
+        return redirect(url_for("login_get"))
 
-@app.get("/directorio/medicos")
-def dir_medicos():
-    return render_template("home.html", lista=medicos_service.listar_az())
+    query = request.args.get("q", "")
+    resultados = []
 
-@app.get("/directorio/pacientes")
-def dir_pacientes():
-    return render_template("home.html", lista=pacientes_service.listar_az())
+    if query:
+        con = get_db()
+        cur = con.cursor()
+        # ejemplo simple: buscar por nombre
+        cur.execute("SELECT * FROM usuarios WHERE nombre LIKE ?", ('%' + query + '%',))
+        resultados = cur.fetchall()
+        con.close()
 
-# ---------- Undo ----------
-@app.post("/undo")
-def deshacer():
-    ok = UndoService(_stack()).deshacer()
-    flash("Acción revertida." if ok else "Nada para deshacer.")
-    return redirect(url_for("dashboard"))
+    return render_template("buscar.html", query=query, resultados=resultados)
 
+#MEDICO
+@app.get("/medico/dashboard")
+def dashboard_medico():
+    if "user" not in session or session["user"]["rol"] != "MEDICO":
+        return redirect(url_for("login_get"))
+
+    con = get_db()
+    cur = con.cursor()
+
+    # citas pendientes
+    cur.execute("""SELECT c.id, u.nombre as paciente_nombre, c.fecha, c.hora, c.tipo
+                   FROM citas c
+                   JOIN usuarios u ON c.paciente_id = u.id
+                   WHERE c.medico_id=? AND c.estado='PENDIENTE'
+                   ORDER BY c.fecha, c.hora""", (session["user"]["id"],))
+    citas = cur.fetchall()
+
+    # historial atendido
+    cur.execute("""SELECT h.fecha, u.nombre as paciente_nombre, h.diagnostico, h.tratamiento
+                   FROM historial h
+                   JOIN usuarios u ON h.paciente_id = u.id
+                   WHERE h.medico_id=?
+                   ORDER BY h.fecha DESC""", (session["user"]["id"],))
+    historial = cur.fetchall()
+
+    # estadísticas simples
+    cur.execute("""SELECT tipo, COUNT(*) as total FROM citas 
+                   WHERE medico_id=? AND estado='ATENDIDA'
+                   GROUP BY tipo""", (session["user"]["id"],))
+    rows = cur.fetchall()
+    stats = {"consultas":0, "emergencias":0}
+    for r in rows:
+        if r["tipo"] == "CONSULTA":
+            stats["consultas"] = r["total"]
+        if r["tipo"] == "EMERGENCIA":
+            stats["emergencias"] = r["total"]
+
+    con.close()
+
+    return render_template("dashboard_medico.html",
+                           user=session["user"], citas=citas,
+                           historial=historial, stats=stats)
+
+@app.get("/medico/citas")
+def medico_citas():
+    if "user" not in session or session["user"]["rol"] != "MEDICO":
+        return redirect(url_for("login_get"))
+    mid = session["user"]["id"]
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("""SELECT c.*, p.nombre as paciente_nombre FROM citas c
+                   JOIN usuarios p ON c.paciente_id=p.id
+                   WHERE c.medico_id=? ORDER BY fecha, hora""", (mid,))
+    citas = cur.fetchall()
+    con.close()
+    return render_template("medico_citas.html", citas=citas)
+
+@app.route("/medico/atender/<int:cita_id>", methods=["GET", "POST"])
+def medico_atender(cita_id):
+    if "user" not in session or session["user"]["rol"] != "MEDICO":
+        return redirect(url_for("login_get"))
+    mid = session["user"]["id"]
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("""SELECT c.*, p.nombre as paciente_nombre FROM citas c
+                   JOIN usuarios p ON c.paciente_id = p.id
+                   WHERE c.id=? AND c.medico_id=?""", (cita_id, mid))
+    cita = cur.fetchone()
+    if not cita:
+        con.close()
+        flash("Cita no encontrada o no eres el médico asignado.", "error")
+        return redirect(url_for("medico_citas"))
+    if request.method == "POST":
+        diagnostico = request.form.get("diagnostico")
+        tratamiento = request.form.get("tratamiento")
+        fecha = datetime.date.today().isoformat()
+        # insertar historial
+        cur.execute("""INSERT INTO historial (paciente_id, medico_id, fecha, diagnostico, tratamiento)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (cita["paciente_id"], mid, fecha, diagnostico, tratamiento))
+        # marcar cita como atendida
+        cur.execute("UPDATE citas SET estado='ATENDIDA' WHERE id=?", (cita_id,))
+        con.commit()
+        con.close()
+        flash("Historial guardado y cita marcada como atendida.", "success")
+        return redirect(url_for("medico_citas"))
+    con.close()
+    return render_template("medico_atender.html", cita=cita)
+
+@app.get("/medico/cancelar/<int:cita_id>")
+def cancelar_cita(cita_id):
+    if "user" not in session or session["user"]["rol"] != "MEDICO":
+        return redirect(url_for("login_get"))
+
+    con = get_db()
+    cur = con.cursor()
+
+    # Verificar que la cita pertenece a este médico
+    cur.execute("SELECT * FROM citas WHERE id=? AND medico_id=?", 
+                (cita_id, session["user"]["id"]))
+    cita = cur.fetchone()
+
+    if not cita:
+        con.close()
+        flash("Cita no encontrada o no autorizada", "error")
+        return redirect(url_for("dashboard_medico"))
+
+    # Cambiar estado a CANCELADA
+    cur.execute("UPDATE citas SET estado='CANCELADA' WHERE id=?", (cita_id,))
+    con.commit()
+    con.close()
+
+    flash("Cita cancelada correctamente", "success")
+    return redirect(url_for("dashboard_medico"))
+
+#REPORTES
+@app.get("/reportes")
+def reportes():
+    if "user" not in session:
+        return redirect(url_for("login_get"))
+    # Opcionalmente podemos restringir a MEDICO/ADMIN
+    con = get_db()
+    cur = con.cursor()
+    # Citas por tipo (CONSULTA/EMERGENCIA)
+    cur.execute("SELECT tipo, COUNT(*) as total FROM citas GROUP BY tipo")
+    rows = cur.fetchall()  
+    by_tipo = [dict(r) for r in rows] 
+
+    # Citas por medico
+    cur.execute("""SELECT u.nombre AS label, COUNT(c.id) AS total
+                   FROM citas c JOIN usuarios u ON c.medico_id = u.id
+                   GROUP BY c.medico_id""")
+    rows = cur.fetchall()  
+    by_medico = [dict(r) for r in rows] 
+    # Pacientes por genero
+    cur.execute("SELECT COALESCE(genero,'ND') AS genero, COUNT(*) AS total FROM usuarios WHERE rol='PACIENTE' GROUP BY genero")
+    rows = cur.fetchall()  
+    by_genero = [dict(r) for r in rows] 
+    # Diagnósticos más comunes
+    cur.execute("SELECT diagnostico, COUNT(*) AS total FROM historial GROUP BY diagnostico ORDER BY total DESC LIMIT 10")
+    rows = cur.fetchall()  
+    top_diag = [dict(r) for r in rows] 
+
+    # Citas por estado
+    cur.execute("SELECT estado, COUNT(*) as total FROM citas GROUP BY estado")
+    rows = cur.fetchall()
+    by_estado = [dict(r) for r in rows]
+
+    con.close()
+    return render_template("reportes.html",
+                           by_tipo=by_tipo,
+                           by_medico=by_medico,
+                           by_genero=by_genero,
+                           top_diag=top_diag,
+                           by_estado=by_estado)
+
+#RECOMENDACIONES
+def recomendaciones_paciente(paciente_id):
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT diagnostico FROM historial WHERE paciente_id=?", (paciente_id,))
+    diags = [r["diagnostico"] for r in cur.fetchall() if r["diagnostico"]]
+    cur.execute("SELECT COUNT(*) as cnt FROM citas WHERE paciente_id=? AND fecha >= date('now','-6 months')", (paciente_id,))
+    recent_count = cur.fetchone()["cnt"]
+    con.close()
+    recs = []
+    # reglas simples
+    if any("Hipertensión" in (d or "") for d in diags):
+        recs.append("Tiene antecedentes de hipertensión. Recomendado control de presión arterial cada 3 meses.")
+    if len(diags) >= 3:
+        recs.append("Ha tenido múltiples diagnósticos. Considera una evaluación integral de salud.")
+    if recent_count == 0:
+        recs.append("No registra citas en los últimos 6 meses. Se recomienda chequeo preventivo.")
+    if not recs:
+        recs.append("Sin recomendaciones específicas. Mantener controles según indicaciones.")
+    return recs
+
+@app.route("/recomendaciones", methods=["GET", "POST"])
+def recomendaciones():
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+
+    pid = session["user"]["id"]
+    recs_auto = recomendaciones_paciente(pid)
+
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT DISTINCT parte FROM recomendaciones")
+    partes = [r[0] for r in cur.fetchall()]
+
+    recomendacion = None
+    parte = None
+
+    if request.method == "POST":
+        parte = request.form["parte"]
+        cur.execute("SELECT recomendacion FROM recomendaciones WHERE parte=?", (parte,))
+        recomendacion = [r[0] for r in cur.fetchall()]
+
+    con.close()
+
+    return render_template("recomendaciones.html",
+                           recomendaciones=recs_auto,
+                           partes=partes,
+                           recomendacion=recomendacion,
+                           parte=parte)
+
+
+@app.route("/paciente/recomendaciones", methods=["GET", "POST"])
+def paciente_recomendaciones():
+    if "user" not in session or session["user"]["rol"] != "PACIENTE":
+        return redirect(url_for("login_get"))
+
+    con = get_db()
+    cur = con.cursor()
+
+    recomendacion = None
+
+    # Convertimos a lista de strings
+    cur.execute("SELECT DISTINCT parte FROM recomendaciones")
+    partes = [r["parte"] for r in cur.fetchall()]
+
+    if request.method == "POST":
+        parte = request.form["parte"]
+        cur.execute("SELECT recomendacion FROM recomendaciones WHERE parte=?", (parte,))
+        rows = cur.fetchall()
+        recomendacion = [r["recomendacion"] for r in rows]
+
+    con.close()
+    
+    return render_template("recomendaciones.html",
+                           partes=partes,
+                           recomendacion=recomendacion)
+
+
+def ensure_google_column():
+    con = sqlite3.connect(DB)
+    cur = con.cursor()
+    cur.execute("PRAGMA table_info(citas)")
+    cols = [row[1] for row in cur.fetchall()]
+    if 'google_event_id' not in cols:
+        cur.execute("ALTER TABLE citas ADD COLUMN google_event_id TEXT")
+        con.commit()
+    con.close()
+
+# Llama a esto una vez al inicio (después de definir DB)
+ensure_google_column()
+
+
+#EJECUTAR
 if __name__ == "__main__":
+    # crear BD si no existe
+    if not os.path.exists(DB):
+        import create_db  # crea y hace seed
     app.run(debug=True)

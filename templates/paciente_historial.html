@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Historial Médico</h2>
+{% if historial %}
+  <ul>
+    {% for h in historial %}
+      <li>
+        <strong>{{ h.fecha }}</strong> — {{ h.diagnostico or 'Sin diagnóstico' }}.
+        <br>Tratamiento: {{ h.tratamiento or 'N/A' }}.
+        <br>Médico: {{ h.medico_nombre or 'N/D' }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No hay entradas en tu historial.</p>
+{% endif %}
+{% endblock %}
+

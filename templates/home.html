@@ -1,23 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero">
-  <h1>HOSPITAL</h1>
-  <p class="subtitle">Sistema de Gestión De Información</p>
-  <div class="cards">
-    <div class="card">👩‍⚕️</div>
-    <div class="card">🚑</div>
-    <div class="card">🏥</div>
-    <div class="card">🚑</div>
-    <div class="card">👩‍⚕️</div>
+  <div class="hero-text">
+    <h1>🏥 HOSPITAL</h1>
+    <p class="subtitle">Sistema de Gestión de Información Médica</p>
+  </div>
+  <div class="hero-img">
+    <img src="{{ url_for('static', filename='img/hospital_hero.jpg') }}" alt="Hospital">
   </div>
 </section>
 
-{% if lista %}
-  <h2>Directorio</h2>
-  <ul class="list">
-    {% for x in lista %}
-      <li>{{ x.id }} — {{ x.nombre }} {% if x.especialidad %} ({{ x.especialidad }}){% endif %}</li>
-    {% endfor %}
-  </ul>
-{% endif %}
+<section class="news">
+  <div class="hero-img">
+    <img src="{{ url_for('static', filename='img/doctors.jpg') }}" alt="Médicos">
+    <h1>Profesionales de la Salud</h1>
+    <p>Accede a tu panel de control para gestionar tus citas y pacientes.</p>
+  </div>
+  <div class="hero-img">
+    <img src="{{ url_for('static', filename='img/patients.jpg') }}" alt="Pacientes">
+    <h3>Pacientes</h3>
+    <p>Agenda tus citas, consulta tu historial y recibe recomendaciones.</p>
+  </div>
+  <div class="hero-img">
+    <img src="{{ url_for('static', filename='img/emergency.jpg') }}" alt="Emergencias">
+    <h3>Emergencias</h3>
+    <p>Atención rápida y prioritaria para consultas de urgencia.</p>
+  </div>
+</section>
+
+<section class="news">
+  <h2>📰 Noticias de Salud</h2>
+  <div class="news-grid">
+    <article>
+      <h4>Chequeos Médicos Preventivos</h4>
+      <p>Realizar controles periódicos permite detectar enfermedades a tiempo.</p>
+    </article>
+    <article>
+      <h4>Avances en Medicina</h4>
+      <p>La telemedicina ha revolucionado la forma en que los pacientes acceden a servicios.</p>
+    </article>
+    <article>
+      <h4>Consejos de Bienestar</h4>
+      <p>Una dieta balanceada y ejercicio regular mejoran la calidad de vida.</p>
+    </article>
+  </div>
+</section>
 {% endblock %}
+

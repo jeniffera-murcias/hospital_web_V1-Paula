@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Agendar Cita</h2>
+<form method="post" class="agendar-cita">
+  <label>Médico:</label>
+  <select name="medico_id" required>
+    {% for m in medicos %}
+    <option value="{{ m['id'] }}">{{ m['nombre'] }} ({{ m['especialidad'] }})</option>
+    {% endfor %}
+  </select>
+
+  <label>Fecha:</label>
+  <input type="date" name="fecha" required>
+
+  <label>Hora:</label>
+  <input type="time" name="hora" required>
+
+  <label>Tipo:</label>
+  <select name="tipo" required>
+    <option value="CONSULTA">Consulta</option>
+    <option value="EMERGENCIA">Emergencia</option>
+  </select>
+
+  <button type="submit">Agendar</button>
+</form>
+{% endblock %}

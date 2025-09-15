@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Panel del Médico</h2>
+<p>Hola, Dr. {{ user.nombre }} ({{ user.especialidad }})</p>
+
+<section class="grid-2">
+  <div>
+    <h3>Próximas Citas</h3>
+    {% if citas %}
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Tipo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in citas %}
+          <tr>
+            <td>{{ c['paciente_nombre'] }}</td>
+            <td>{{ c['fecha'] }}</td>
+            <td>{{ c['hora'] }}</td>
+            <td>{{ c['tipo'] }}</td>
+            <td>
+              <a class="btn" href="{{ url_for('medico_atender', cita_id=c['id']) }}">Atender</a>
+              <a class="btn-outline" href="{{ url_for('cancelar_cita', cita_id=c['id']) }}">Cancelar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No tienes citas pendientes.</p>
+    {% endif %}
+  </div>
+
+  <div>
+    <h3>Historial de Consultas</h3>
+    {% if historial %}
+      <ul class="list">
+        {% for h in historial %}
+          <li>
+            {{ h['fecha'] }} – Paciente: {{ h['paciente_nombre'] }}<br>
+            <strong>Dx:</strong> {{ h['diagnostico'] }} <br>
+            <strong>Tto:</strong> {{ h['tratamiento'] }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No hay registros.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section>
+  <h3>Estadísticas</h3>
+  <canvas id="statsChart"></canvas>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('statsChart');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['Consultas', 'Emergencias'],
+    datasets: [{
+      label: 'Citas Atendidas',
+      data: [{{ stats.consultas }}, {{ stats.emergencias }}],
+      backgroundColor: ['#2563eb', '#dc2626']
+    }]
+  }
+});
+</script>
+{% endblock %}

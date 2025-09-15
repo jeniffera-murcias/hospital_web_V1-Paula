@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Atender Cita - {{ cita.paciente_nombre }}</h2>
+<p>Fecha: {{ cita.fecha }} - Hora: {{ cita.hora }}</p>
+
+<form method="post" class="form">
+  <label>Diagnóstico:
+    <textarea name="diagnostico" rows="4"></textarea>
+  </label>
+
+  <label>Tratamiento:
+    <textarea name="tratamiento" rows="4"></textarea>
+  </label>
+
+  <button class="btn" type="submit">Guardar historial y marcar como atendida</button>
+  <a class="btn-outline" href="{{ url_for('medico_citas') }}">Volver</a>
+</form>
+{% endblock %}

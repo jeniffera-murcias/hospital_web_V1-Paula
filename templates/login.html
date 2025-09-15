@@ -1,23 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Iniciar Sesión</h2>
-<div class="tabs">
-  <button class="tab active" onclick="setRol('PACIENTE', this)">Pacientes</button>
-  <button class="tab" onclick="setRol('MEDICO', this)">Profesionales de la Salud</button>
-</div>
 <form method="post" class="form">
-  <input type="hidden" name="role" id="role" value="PACIENTE">
-  <label>Tipo de Documento <input placeholder="CC, TI..."></label>
-  <label>Numero de Documento <input name="user_id" required placeholder="p1/m1"></label>
-  <label>Contraseña <input type="password" placeholder="demo (no se valida)"></label>
+  <label>Rol:
+    <select name="role" required>
+      <option value="PACIENTE">Paciente</option>
+      <option value="MEDICO">Médico</option>
+    </select>
+  </label>
+
+  <label>Tipo de Documento:
+    <select name="tipo_documento" required>
+      <option value="CC">Cédula de Ciudadanía</option>
+      <option value="TI">Tarjeta de Identidad</option>
+      <option value="CE">Cédula de Extranjería</option>
+      <option value="PA">Pasaporte</option>
+    </select>
+  </label>
+
+  <label>Número de Documento
+    <input name="numero_documento" required>
+  </label>
+
+  <label>Contraseña
+    <input type="password" name="password" required>
+  </label>
+
   <button class="btn" type="submit">Ingresar</button>
   <div class="muted"><a href="{{ url_for('register_get') }}">Registrarse</a></div>
 </form>
-<script>
-function setRol(rol, btn){
-  document.getElementById('role').value = rol;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-}
-</script>
 {% endblock %}

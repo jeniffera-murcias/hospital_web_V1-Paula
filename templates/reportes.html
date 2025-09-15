@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Reportes y Estadísticas</h2>
+
+<canvas id="chartTipo"></canvas>
+<canvas id="chartMedico"></canvas>
+<canvas id="chartGenero"></canvas>
+<canvas id="chartDiag"></canvas>
+<canvas id="chartEstado"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const byTipo = {{ by_tipo|tojson }};
+const byMedico = {{ by_medico|tojson }};
+const byGenero = {{ by_genero|tojson }};
+const topDiag = {{ top_diag|tojson }};
+const byEstado = {{ by_estado|default([])|tojson }};  // <-- evitar crash si no existe
+
+// Citas por tipo
+new Chart(document.getElementById('chartTipo'), {
+  type: 'bar',
+  data: {
+    labels: byTipo.map(r => r.tipo),
+    datasets: [{ label: 'Citas', data: byTipo.map(r => r.total), backgroundColor: '#2563eb' }]
+  }
+});
+
+// Citas por médico
+new Chart(document.getElementById('chartMedico'), {
+  type: 'bar',
+  data: {
+    labels: byMedico.map(r => r.label),
+    datasets: [{ label: 'Citas por Médico', data: byMedico.map(r => r.total), backgroundColor: '#22c55e' }]
+  }
+});
+
+// Pacientes por género
+new Chart(document.getElementById('chartGenero'), {
+  type: 'pie',
+  data: {
+    labels: byGenero.map(r => r.genero),
+    datasets: [{ data: byGenero.map(r => r.total), backgroundColor: ['#2563eb','#dc2626','#eab308'] }]
+  }
+});
+
+// Top diagnósticos
+new Chart(document.getElementById('chartDiag'), {
+  type: 'bar',
+  data: {
+    labels: topDiag.map(r => r.diagnostico),
+    datasets: [{ label: 'Frecuencia', data: topDiag.map(r => r.total), backgroundColor: '#9333ea' }]
+  }
+});
+
+// Citas por estado
+if (byEstado.length) {
+  new Chart(document.getElementById('chartEstado'), {
+    type: 'doughnut',
+    data: {
+      labels: byEstado.map(r => r.estado),
+      datasets: [{ data: byEstado.map(r => r.total), backgroundColor: ['#22c55e','#eab308','#dc2626'] }]
+    }
+  });
+}
+</script>
+{% endblock %}
